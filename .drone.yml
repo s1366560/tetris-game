@@ -63,11 +63,15 @@ steps:
       - name: docker-sock
         path: /var/run/docker.sock
     commands:
+      - echo "[docker-build] Current directory: $(pwd)"
+      - echo "[docker-build] Listing files..."
+      - ls -la
       - echo "[docker-build] Building backend image..."
-      - "docker build -t tetris-backend:drone -f backend/Dockerfile ./backend"
+      - "docker build -t tetris-backend:drone -f backend/Dockerfile ./backend 2>&1 | tail -5"
       - echo "[docker-build] Building frontend image..."
-      - "docker build -t tetris-frontend:drone -f frontend/Dockerfile ./frontend"
+      - "docker build -t tetris-frontend:drone -f frontend/Dockerfile ./frontend 2>&1 | tail -5"
       - echo "[docker-build] Both images built."
+      - "docker images | grep tetris"
     when:
       event:
         - push
@@ -82,12 +86,19 @@ steps:
       - name: docker-sock
         path: /var/run/docker.sock
     commands:
-      - echo "[deploy] Starting services via docker compose..."
+      - echo "[deploy] Current directory: $(pwd)"
+      - echo "[deploy] Docker info:"
+      - docker version 2>&1 | head -10
+      - echo "[deploy] Stopping existing containers..."
       - "docker compose down 2>/dev/null || true"
-      - "docker compose up -d"
+      - "docker ps -a --filter name=tetris 2>/dev/null || echo 'No existing containers'"
+      - echo "[deploy] Starting services via docker compose..."
+      - "docker compose up -d 2>&1"
+      - echo "[deploy] Container status after up:"
+      - "docker ps --filter name=tetris"
       - echo "[deploy] Waiting for backend health (up to 60s)..."
-      - "for i in $(seq 1 30); do wget -qO- http://host.docker.internal:3001/health >/dev/null 2>&1 && echo '[deploy] Backend healthy!' && break || sleep 2; done"
-      - "wget -qO- http://host.docker.internal:3001/health || { echo '[deploy] FAILED: Backend not responding'; docker compose logs; exit 1; }"
+      - "for i in $(seq 1 30); do wget -qO- http://host.docker.internal:3001/health >/dev/null 2>&1 && echo '[deploy] Backend healthy!' && break || echo '[deploy] Waiting... ($i/30)'; sleep 2; done"
+      - "wget -v http://host.docker.internal:3001/health 2>&1 || { echo '[deploy] FAILED: Backend not responding'; docker compose logs --tail=20; docker ps -a; exit 1; }"
       - echo "[deploy] Deployment successful!"
     when:
       event:
