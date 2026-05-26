@@ -15,46 +15,33 @@ trigger:
     - master
 
 steps:
-  # Step 1: Repository Smoke Test
   - name: repository-smoke
     image: node:20-alpine
     commands:
-      - node --version
-      - npm --version
+      - node --version && npm --version
       - test -f backend/package.json
       - test -f frontend/package.json
       - test -f docker-compose.yml
-      - echo "[smoke] OK - project files present"
+      - echo "[smoke] OK"
 
-  # Step 2: Backend TypeScript Build
   - name: backend-build
     image: node:20-alpine
     commands:
-      - echo "[backend-build] Installing dependencies..."
-      - cd backend && npm install --silent
-      - echo "[backend-build] Running TypeScript build..."
-      - npm run build
-      - echo "[backend-build] Build complete."
+      - cd backend && npm install --silent && npm run build
     when:
       event:
         - push
         - custom
 
-  # Step 3: Frontend Build
   - name: frontend-build
     image: node:20-alpine
     commands:
-      - echo "[frontend-build] Installing dependencies..."
-      - cd frontend && npm install --silent
-      - echo "[frontend-build] Running Vite build..."
-      - npm run build
-      - echo "[frontend-build] Build complete."
+      - cd frontend && npm install --silent && npm run build
     when:
       event:
         - push
         - custom
 
-  # Step 4: Docker Build (both images)
   - name: docker-build
     image: docker:cli
     environment:
@@ -63,21 +50,13 @@ steps:
       - name: docker-sock
         path: /var/run/docker.sock
     commands:
-      - echo "[docker-build] Current directory: $(pwd)"
-      - echo "[docker-build] Listing files..."
-      - ls -la
-      - echo "[docker-build] Building backend image..."
-      - "docker build -t tetris-backend:drone -f backend/Dockerfile ./backend 2>&1 | tail -5"
-      - echo "[docker-build] Building frontend image..."
-      - "docker build -t tetris-frontend:drone -f frontend/Dockerfile ./frontend 2>&1 | tail -5"
-      - echo "[docker-build] Both images built."
-      - "docker images | grep tetris"
+      - docker build -t tetris-backend:drone -f backend/Dockerfile ./backend
+      - docker build -t tetris-frontend:drone -f frontend/Dockerfile ./frontend
     when:
       event:
         - push
         - custom
 
-  # Step 5: Deploy via Docker Compose
   - name: deploy
     image: docker:cli
     environment:
@@ -86,40 +65,24 @@ steps:
       - name: docker-sock
         path: /var/run/docker.sock
     commands:
-      - echo "[deploy] Current directory: $(pwd)"
-      - echo "[deploy] Docker info:"
-      - docker version 2>&1 | head -10
-      - echo "[deploy] Stopping existing containers..."
-      - "docker compose down 2>/dev/null || true"
-      - "docker ps -a --filter name=tetris 2>/dev/null || echo 'No existing containers'"
-      - echo "[deploy] Starting services via docker compose..."
-      - "docker compose up -d 2>&1"
-      - echo "[deploy] Container status after up:"
-      - "docker ps --filter name=tetris"
-      - echo "[deploy] Waiting for backend health (up to 60s)..."
-      - "for i in $(seq 1 30); do wget -qO- http://host.docker.internal:3001/health >/dev/null 2>&1 && echo '[deploy] Backend healthy!' && break || echo '[deploy] Waiting... ($i/30)'; sleep 2; done"
-      - "wget -v http://host.docker.internal:3001/health 2>&1 || { echo '[deploy] FAILED: Backend not responding'; docker compose logs --tail=20; docker ps -a; exit 1; }"
-      - echo "[deploy] Deployment successful!"
+      - docker compose down 2>/dev/null || true
+      - docker compose up -d
+      - for i in $(seq 1 30); do wget -qO- http://host.docker.internal:3001/health >/dev/null 2>&1 && break || sleep 2; done
+      - wget -qO- http://host.docker.internal:3001/health || { docker compose logs; exit 1; }
+      - echo "[deploy] Done!"
     when:
       event:
         - push
         - custom
 
-  # Step 6: Post-deploy Health Check
   - name: health-check
     image: alpine:latest
     commands:
       - apk add --no-cache curl wget
-      - echo "[health-check] Testing backend..."
-      - "for i in $(seq 1 15); do curl -sf http://host.docker.internal:3001/health >/dev/null && break || sleep 2; done"
+      - for i in $(seq 1 15); do curl -sf http://host.docker.internal:3001/health >/dev/null && break || sleep 2; done
       - curl -sf http://host.docker.internal:3001/health
-      - echo ""
-      - echo "[health-check] Testing API..."
       - curl -sf http://host.docker.internal:3001/api/leaderboard
-      - echo ""
-      - echo "[health-check] Testing frontend..."
-      - curl -sf http://host.docker.internal:3000/ >/dev/null && echo "[health-check] Frontend OK" || echo "[health-check] Frontend returned non-200"
-      - echo "[health-check] All checks complete!"
+      - curl -sf http://host.docker.internal:3000/ >/dev/null && echo "Frontend OK" || echo "Frontend check"
     when:
       event:
         - push
