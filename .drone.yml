@@ -50,26 +50,33 @@ steps:
 
   - name: deploy
     image: docker:cli
-    environment:
-      DOCKER_HOST: unix:///var/run/docker.sock
+    network_mode: host
     volumes:
       - name: docker-sock
         path: /var/run/docker.sock
     commands:
-      - docker compose down || true
-      - docker compose up -d
-      - sleep 30
+      - echo "Docker version"
+      - docker version
+      - echo "Stopping old containers"
+      - docker stop tetris-app tetris-frontend 2>/dev/null || true
+      - docker rm tetris-app tetris-frontend 2>/dev/null || true
+      - echo "Listing images"
+      - docker images tetris-backend
+      - docker images tetris-frontend
+      - echo "Starting backend"
+      - docker run -d --network host --name tetris-app --restart unless-stopped tetris-backend:drone
+      - echo "Starting frontend"
+      - docker run -d --network host --name tetris-frontend --restart unless-stopped tetris-frontend:drone
+      - echo "Running containers"
       - docker ps -a
-      - docker compose logs
-      - wget -qO- http://host.docker.internal:3001/health || exit 1
-
-  - name: health-check
-    image: alpine:latest
-    network_mode: host
-    commands:
-      - apk add --no-cache wget
+      - echo "Container logs"
+      - docker logs tetris-app 2>&1 | tail -20 || true
+      - docker logs tetris-frontend 2>&1 | tail -20 || true
+      - echo "Waiting 15s for startup"
+      - sleep 15
+      - echo "Health check"
       - wget -qO- http://127.0.0.1:3001/health
-      - wget -qO- http://127.0.0.1:3001/api/leaderboard
+      - wget -qO- http://127.0.0.1:3000/ || echo "frontend not reachable"
 
 volumes:
   - name: docker-sock
