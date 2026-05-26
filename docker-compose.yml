@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Drone 期望的 my-evo-app 服务（使用后端镜像）
+  my-evo-app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tetris-app
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+    networks:
+      - tetris-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tetris-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - my-evo-app
+    networks:
+      - tetris-network
+    restart: unless-stopped
+
+networks:
+  tetris-network:
+    driver: bridge

@@ -1,0 +1,7 @@
+
+> tetris-backend@1.0.0 start
+> node dist/index.js
+
+🎮 Tetris Backend running on port 3001
+   HTTP: http://localhost:3001
+   WebSocket: ws://localhost:3001/ws

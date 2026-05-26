@@ -1,0 +1,19 @@
+{
+  "workspace": {
+    "backend": "backend",
+    "frontend": "frontend"
+  },
+  "delivery_cicd": {
+    "provider": "drone",
+    "config_path": ".drone.yml",
+    "drone": {
+      "deploy": {
+        "docker": {
+          "deploy_services": ["my-evo-app", "frontend"],
+          "compose_file": "docker-compose.yml",
+          "registry": "host.docker.internal:5001"
+        }
+      }
+    }
+  }
+}
