@@ -58,17 +58,18 @@ steps:
     commands:
       - docker compose down || true
       - docker compose up -d
-      - sleep 10
+      - sleep 30
       - docker ps -a
       - docker compose logs
       - wget -qO- http://host.docker.internal:3001/health || exit 1
 
   - name: health-check
     image: alpine:latest
+    network_mode: host
     commands:
       - apk add --no-cache wget
-      - curl http://host.docker.internal:3001/health
-      - curl http://host.docker.internal:3001/api/leaderboard
+      - wget -qO- http://127.0.0.1:3001/health
+      - wget -qO- http://127.0.0.1:3001/api/leaderboard
 
 volumes:
   - name: docker-sock
