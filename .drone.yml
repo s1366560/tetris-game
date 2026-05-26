@@ -75,8 +75,8 @@ steps:
       - echo "Waiting 15s for startup"
       - sleep 15
       - echo "Health check"
-      - wget -qO- http://127.0.0.1:3001/health
-      - wget -qO- http://127.0.0.1:3000/ || echo "frontend not reachable"
+      - wget -qO- http://127.0.0.1:3011/health
+      - wget -qO- http://127.0.0.1:3080/ || echo "frontend not reachable"
 
 volumes:
   - name: docker-sock

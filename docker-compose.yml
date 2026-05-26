@@ -8,10 +8,10 @@ services:
       dockerfile: Dockerfile
     container_name: tetris-app
     ports:
-      - "3001:3001"
+      - "3011:3011"
     environment:
       - NODE_ENV=production
-      - PORT=3001
+      - PORT=3011
     networks:
       - tetris-network
     restart: unless-stopped
@@ -28,7 +28,7 @@ services:
       dockerfile: Dockerfile
     container_name: tetris-frontend
     ports:
-      - "3000:80"
+      - "3080:3080"
     depends_on:
       - my-evo-app
     networks:
