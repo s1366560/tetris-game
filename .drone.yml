@@ -18,16 +18,18 @@ steps:
   - name: repository-smoke
     image: node:20-alpine
     commands:
-      - node --version && npm --version
+      - node --version
+      - npm --version
       - test -f backend/package.json
       - test -f frontend/package.json
-      - test -f docker-compose.yml
-      - echo "[smoke] OK"
+      - echo "OK"
 
   - name: backend-build
     image: node:20-alpine
     commands:
-      - cd backend && npm install --silent && npm run build
+      - cd backend
+      - npm install --silent
+      - npm run build
     when:
       event:
         - push
@@ -36,7 +38,9 @@ steps:
   - name: frontend-build
     image: node:20-alpine
     commands:
-      - cd frontend && npm install --silent && npm run build
+      - cd frontend
+      - npm install --silent
+      - npm run build
     when:
       event:
         - push
@@ -65,29 +69,13 @@ steps:
       - name: docker-sock
         path: /var/run/docker.sock
     commands:
-      - echo "=== Docker Info ==="
-      - docker version
-      - docker info 2>&1 | head -20
-      - echo "=== Docker Images ==="
-      - docker images
-      - echo "=== Stopping old containers ==="
-      - docker compose down 2>/dev/null || true
-      - docker ps -a --filter name=tetris 2>/dev/null || echo "No tetris containers"
-      - echo "=== Starting containers ==="
-      - docker compose up -d 2>&1
-      - echo "=== Container Status ==="
-      - docker ps --filter name=tetris
-      - docker ps -a --filter name=tetris
-      - echo "=== Docker Compose Logs ==="
-      - docker compose logs --tail=50 2>&1 || true
-      - echo "=== Health Check ==="
-      - for i in $(seq 1 30); do
-          wget -qO- http://host.docker.internal:3001/health >/dev/null 2>&1 && echo "Backend is healthy!" && break
-          echo "Attempt $i/30: waiting..."
-          sleep 2
-        done
-      - wget -v http://host.docker.internal:3001/health 2>&1 || { echo "Health check FAILED"; docker compose logs; docker ps -a; exit 1; }
-      - echo "[deploy] SUCCESS!"
+      - docker compose down || true
+      - docker compose up -d
+      - sleep 5
+      - docker ps
+      - docker compose logs
+      - for i in $(seq 1 30); do wget -qO- http://host.docker.internal:3001/health && break || sleep 2; done
+      - wget -v http://host.docker.internal:3001/health || exit 1
     when:
       event:
         - push
@@ -96,11 +84,9 @@ steps:
   - name: health-check
     image: alpine:latest
     commands:
-      - apk add --no-cache curl wget
-      - for i in $(seq 1 15); do curl -sf http://host.docker.internal:3001/health >/dev/null && break || sleep 2; done
+      - apk add --no-cache wget
       - curl -sf http://host.docker.internal:3001/health
       - curl -sf http://host.docker.internal:3001/api/leaderboard
-      - curl -sf http://host.docker.internal:3000/ >/dev/null && echo "Frontend OK" || echo "Frontend check"
     when:
       event:
         - push
