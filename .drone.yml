@@ -15,24 +15,23 @@ trigger:
     - master
 
 steps:
-  # Step 1: Repository Smoke Test (at workspace root, checks tetris-game subdir exists)
+  # Step 1: Repository Smoke Test
   - name: repository-smoke
     image: node:20-alpine
     commands:
       - node --version
       - npm --version
-      - echo "[smoke] Checking tetris-game directory..."
-      - test -f tetris-game/backend/package.json
-      - test -f tetris-game/frontend/package.json
-      - test -f tetris-game/docker-compose.yml
-      - echo "[smoke] OK - tetris-game project files present"
+      - test -f backend/package.json
+      - test -f frontend/package.json
+      - test -f docker-compose.yml
+      - echo "[smoke] OK - project files present"
 
   # Step 2: Backend TypeScript Build
   - name: backend-build
     image: node:20-alpine
     commands:
-      - echo "[backend-build] Installing backend dependencies..."
-      - cd tetris-game/backend && npm install --silent
+      - echo "[backend-build] Installing dependencies..."
+      - cd backend && npm install --silent
       - echo "[backend-build] Running TypeScript build..."
       - npm run build
       - echo "[backend-build] Build complete."
@@ -45,8 +44,8 @@ steps:
   - name: frontend-build
     image: node:20-alpine
     commands:
-      - echo "[frontend-build] Installing frontend dependencies..."
-      - cd tetris-game/frontend && npm install --silent
+      - echo "[frontend-build] Installing dependencies..."
+      - cd frontend && npm install --silent
       - echo "[frontend-build] Running Vite build..."
       - npm run build
       - echo "[frontend-build] Build complete."
@@ -65,10 +64,10 @@ steps:
         path: /var/run/docker.sock
     commands:
       - echo "[docker-build] Building backend image..."
-      - "docker build -t tetris-backend:drone -f tetris-game/backend/Dockerfile ./tetris-game/backend"
+      - "docker build -t tetris-backend:drone -f backend/Dockerfile ./backend"
       - echo "[docker-build] Building frontend image..."
-      - "docker build -t tetris-frontend:drone -f tetris-game/frontend/Dockerfile ./tetris-game/frontend"
-      - echo "[docker-build] Both images built successfully."
+      - "docker build -t tetris-frontend:drone -f frontend/Dockerfile ./frontend"
+      - echo "[docker-build] Both images built."
     when:
       event:
         - push
@@ -83,14 +82,11 @@ steps:
       - name: docker-sock
         path: /var/run/docker.sock
     commands:
-      - echo "[deploy] Changing to project directory..."
-      - cd tetris-game
-      - echo "[deploy] Stopping existing containers..."
-      - "docker compose down 2>/dev/null || true"
       - echo "[deploy] Starting services via docker compose..."
+      - "docker compose down 2>/dev/null || true"
       - "docker compose up -d"
-      - echo "[deploy] Waiting for backend health check (up to 60s)..."
-      - "for i in $(seq 1 30); do wget -qO- http://host.docker.internal:3001/health >/dev/null 2>&1 && echo '[deploy] Backend is healthy!' && break || { echo '[deploy] Waiting... (attempt $i/30)'; sleep 2; }; done"
+      - echo "[deploy] Waiting for backend health (up to 60s)..."
+      - "for i in $(seq 1 30); do wget -qO- http://host.docker.internal:3001/health >/dev/null 2>&1 && echo '[deploy] Backend healthy!' && break || sleep 2; done"
       - "wget -qO- http://host.docker.internal:3001/health || { echo '[deploy] FAILED: Backend not responding'; docker compose logs; exit 1; }"
       - echo "[deploy] Deployment successful!"
     when:
@@ -103,11 +99,11 @@ steps:
     image: alpine:latest
     commands:
       - apk add --no-cache curl wget
-      - echo "[health-check] Testing backend /health endpoint..."
+      - echo "[health-check] Testing backend..."
       - "for i in $(seq 1 15); do curl -sf http://host.docker.internal:3001/health >/dev/null && break || sleep 2; done"
       - curl -sf http://host.docker.internal:3001/health
       - echo ""
-      - echo "[health-check] Testing /api/leaderboard..."
+      - echo "[health-check] Testing API..."
       - curl -sf http://host.docker.internal:3001/api/leaderboard
       - echo ""
       - echo "[health-check] Testing frontend..."
