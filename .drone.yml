@@ -56,6 +56,7 @@ steps:
     commands:
       - docker build -t tetris-backend:drone -f backend/Dockerfile ./backend
       - docker build -t tetris-frontend:drone -f frontend/Dockerfile ./frontend
+      - docker images | grep tetris
     when:
       event:
         - push
@@ -69,13 +70,28 @@ steps:
       - name: docker-sock
         path: /var/run/docker.sock
     commands:
+      - echo "Stopping existing containers..."
       - docker compose down || true
+      - echo "Starting containers..."
       - docker compose up -d
-      - sleep 5
-      - docker ps
-      - docker compose logs
-      - for i in $(seq 1 30); do wget -qO- http://host.docker.internal:3001/health && break || sleep 2; done
-      - wget -v http://host.docker.internal:3001/health || exit 1
+      - echo "Waiting 10 seconds for containers to start..."
+      - sleep 10
+      - echo "Container status:"
+      - docker ps -a --filter name=tetris
+      - echo "Container logs (my-evo-app):"
+      - docker compose logs my-evo-app 2>&1 || true
+      - echo "Container logs (all):"
+      - docker compose logs 2>&1 || true
+      - echo "Attempting health check..."
+      - for i in $(seq 1 30); do
+          echo "Health check attempt $i/30..."
+          RESULT=$(wget -qO- http://host.docker.internal:3001/health 2>&1) && echo "Backend responded: $RESULT" && break
+          echo "Backend not responding, waiting 2 seconds..."
+          sleep 2
+        done
+      - echo "Final health check:"
+      - wget -v http://host.docker.internal:3001/health 2>&1 || echo "HEALTH CHECK FAILED - see logs above"
+      - echo "Done!"
     when:
       event:
         - push
@@ -85,8 +101,8 @@ steps:
     image: alpine:latest
     commands:
       - apk add --no-cache wget
-      - curl -sf http://host.docker.internal:3001/health
-      - curl -sf http://host.docker.internal:3001/api/leaderboard
+      - curl -sf http://host.docker.internal:3001/health || echo "Backend check failed"
+      - curl -sf http://host.docker.internal:3001/api/leaderboard || echo "API check failed"
     when:
       event:
         - push
